@@ -214,9 +214,9 @@ jobs:
       image: fedora:41
 
     steps:
-      - name: Install git (required before checkout)
+      - name: Install git
         run: dnf install -y git tar
-        
+
       - name: Checkout code
         uses: actions/checkout@v6
         with:
@@ -235,7 +235,7 @@ jobs:
 
       - name: Setup rpmbuild tree
         run: rpmdev-setuptree
-        
+
       - name: Sync spec version with tag and disable Qt deploy
         run: |
           TAG_VERSION="${GITHUB_REF_NAME#v}"
@@ -257,10 +257,10 @@ jobs:
 
       - name: Build RPM
         run: |
-            echo '%debug_package %{nil}' >> ~/.rpmmacros
-            rpmbuild -bb "$HOME/rpmbuild/SPECS/cremniy.spec"
+          echo '%debug_package %{nil}' >> ~/.rpmmacros
+          rpmbuild -bb "$HOME/rpmbuild/SPECS/cremniy.spec"
 
-      - name: Rename RPMs for clarity
+      - name: Collect RPMs
         run: |
           mkdir -p dist
           find "$HOME/rpmbuild/RPMS" -name '*.rpm' -exec cp {} dist/ \;
