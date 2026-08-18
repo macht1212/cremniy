@@ -293,12 +293,94 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
     MACOSX_BUNDLE TRUE
     WIN32_EXECUTABLE TRUE
 )
-
 include(GNUInstallDirs)
+
 install(TARGETS ${PROJECT_NAME}
     BUNDLE DESTINATION .
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
 
+set_target_properties(${PROJECT_NAME} PROPERTIES
+    INSTALL_RPATH "$ORIGIN/../lib"
+)
+
+install(
+    FILES ${CMAKE_SOURCE_DIR}/../cremniy.desktop
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/applications
+)
+
+install(
+    FILES ${CMAKE_CURRENT_SOURCE_DIR}/resources/icons/icon.svg
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps
+    RENAME cremniy.svg
+)
+
 qt_finalize_executable(${PROJECT_NAME})
+
+set_target_properties(${PROJECT_NAME} PROPERTIES
+    BUILD_RPATH "/opt/Qt6/6.8.2-xcb/lib"
+    INSTALL_RPATH "\$ORIGIN/../lib"
+    INSTALL_RPATH_USE_LINK_PATH FALSE
+)
+
+qt_generate_deploy_app_script(
+    TARGET ${PROJECT_NAME}
+    OUTPUT_SCRIPT deploy_script
+    NO_TRANSLATIONS
+)
+
+install(SCRIPT ${deploy_script})
+
+set(CPACK_PACKAGE_NAME "cremniy")
+set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY
+    "Low-Level Development Environment"
+)
+
+set(CPACK_PACKAGE_VENDOR "Cremniy")
+set(CPACK_PACKAGE_CONTACT "@igmunv")
+
+
+if(WIN32)
+
+    set(CPACK_GENERATOR "NSIS")
+
+    set(CPACK_PACKAGE_INSTALL_DIRECTORY "Cremniy")
+
+    set(CPACK_NSIS_DISPLAY_NAME "Cremniy")
+    set(CPACK_NSIS_PACKAGE_NAME "Cremniy")
+
+    set(CPACK_NSIS_EXECUTABLES_DIRECTORY ".")
+    set(CPACK_NSIS_CREATE_DESKTOP_LINKS "cremniy.exe")
+    set(CPACK_NSIS_CREATE_START_MENU_SHORTCUTS "Cremniy")
+
+    set(CPACK_NSIS_FILE_NAME
+        "cremniy-${PROJECT_VERSION}-Windows.exe"
+    )
+
+elseif(APPLE)
+
+    set(CPACK_GENERATOR "DragNDrop")
+
+    set(CPACK_PACKAGE_FILE_NAME
+        "cremniy-${PROJECT_VERSION}-macOS"
+    )
+
+else()
+
+    set(CPACK_GENERATOR "DEB")
+
+    set(CPACK_DEBIAN_PACKAGE_MAINTAINER "@igmunv")
+    set(CPACK_DEBIAN_PACKAGE_SECTION "devel")
+    set(CPACK_DEBIAN_PACKAGE_PRIORITY "optional")
+
+    set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
+
+    set(CPACK_DEBIAN_FILE_NAME
+        "cremniy-${PROJECT_VERSION}-Linux.deb"
+    )
+
+endif()
+
+include(CPack)
