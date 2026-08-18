@@ -21,8 +21,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
-        with:
-          submodules: recursive
 
       - name: Setup sccache
         uses: mozilla-actions/sccache-action@v0.0.10
@@ -35,15 +33,15 @@ jobs:
           arch: 'win64_msvc2022_64'
           cache: true
 
-      - name: Set up MSVC Developer Command Prompt (Windows)
+      - name: Set up MSVC Developer Command Prompt
         if: runner.os == 'Windows'
         uses: ilammy/msvc-dev-cmd@v1
-
+      
       - name: Install Qt (Linux/macOS)
         if: runner.os != 'Windows'
         uses: jurplel/install-qt-action@v4
         with:
-          version: '6.8.3'
+          version: '6.9.2'
           cache: true
 
       - name: Install Linux dependencies
@@ -55,8 +53,7 @@ jobs:
             libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
             libxcb-render-util0 libxcb-xinerama0 libxcb-cursor0 \
             libxcb-xkb1 libdbus-1-3 \
-            libfuse2 file imagemagick librsvg2-bin \
-            dpkg-dev fakeroot
+            libfuse2 file imagemagick librsvg2-bin
 
       - name: Cache vcpkg binary archives (Linux)
         if: runner.os == 'Linux'
@@ -64,7 +61,8 @@ jobs:
         with:
           path: ~/.cache/vcpkg/archives
           key: vcpkg-archives-linux-libgit2-v1
-          restore-keys: vcpkg-archives-linux-
+          restore-keys: |
+            vcpkg-archives-linux-
 
       - name: Cache vcpkg binary archives (Windows)
         if: runner.os == 'Windows'
@@ -72,7 +70,8 @@ jobs:
         with:
           path: C:\Users\runneradmin\AppData\Local\vcpkg\archives
           key: vcpkg-archives-windows-libgit2-v1
-          restore-keys: vcpkg-archives-windows-
+          restore-keys: |
+            vcpkg-archives-windows-
 
       - name: Cache vcpkg binary archives (macOS)
         if: runner.os == 'macOS'
@@ -80,7 +79,8 @@ jobs:
         with:
           path: ~/vcpkg/archives
           key: vcpkg-archives-macos-libgit2-v1
-          restore-keys: vcpkg-archives-macos-
+          restore-keys: |
+            vcpkg-archives-macos-
 
       - name: Setup vcpkg (Linux)
         if: runner.os == 'Linux'
@@ -104,7 +104,7 @@ jobs:
           ./vcpkg/bootstrap-vcpkg.sh
           ./vcpkg/vcpkg install libgit2
 
-      - name: Download linuxdeploy tools (Linux)
+      - name: Download linuxdeploy tools
         if: runner.os == 'Linux'
         run: |
           wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
@@ -112,56 +112,38 @@ jobs:
           chmod +x linuxdeploy-x86_64.AppImage
           chmod +x linuxdeploy-plugin-qt-x86_64.AppImage
 
-      - name: Configure CMake (Linux)
-        if: runner.os == 'Linux'
-        env:
-          SCCACHE_GHA_ENABLED: "true"
-        run: |
-          cmake -B build -S src \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_C_COMPILER_LAUNCHER=sccache \
-            -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
-            -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake"
-
       - name: Configure CMake (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         env:
           SCCACHE_GHA_ENABLED: "true"
-        run: |
-          cmake -B build -S src `
-            -DCMAKE_BUILD_TYPE=Release `
-            -G "Ninja" `
-            -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl `
-            -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache `
-            -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}\vcpkg\scripts\buildsystems\vcpkg.cmake"
+        run: cmake -B build -S src -DCMAKE_BUILD_TYPE=Release -G "Ninja" -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}\\vcpkg\\scripts\\buildsystems\\vcpkg.cmake"
 
       - name: Configure CMake (macOS)
         if: runner.os == 'macOS'
         env:
           SCCACHE_GHA_ENABLED: "true"
-        run: |
-          cmake -B build -S src \
-            -DCMAKE_BUILD_TYPE=Release \
-            -G "Unix Makefiles" \
-            -DCMAKE_C_COMPILER_LAUNCHER=sccache \
-            -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
-            -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake" \
-            -DQT_FEATURE_opengl=OFF
+        run: cmake -B build -S src -DCMAKE_BUILD_TYPE=Release -G "Unix Makefiles" -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake" -DQT_FEATURE_opengl=OFF
 
+      - name: Configure CMake (Linux)
+        if: runner.os == 'Linux'
+        env:
+          SCCACHE_GHA_ENABLED: "true"
+        run: cmake -B build -S src -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake"
+
+          
       - name: Build
         run: cmake --build build --config Release --parallel
-
-      - name: Install NSIS (Windows)
-        if: runner.os == 'Windows'
-        run: choco install nsis -y
 
       - name: Package (Linux) - AppImage
         if: runner.os == 'Linux'
         run: |
-          echo -e "[Desktop Entry]\nType=Application\nName=Cremniy\nExec=cremniy\nIcon=cremniy\nCategories=Development;IDE;" > cremniy.desktop
+          echo -e "[Desktop Entry]\nType=Application\nName=Cremniy\nExec=cremniy\nIcon=cremniy\nCategories=Utility;" > cremniy.desktop
+
           rsvg-convert src/resources/icons/icon.svg -w 256 -h 256 -o cremniy.png
+
           export QML_SOURCES_PATHS=${{ github.workspace }}/src
+
           ./linuxdeploy-x86_64.AppImage --appimage-extract-and-run \
             --appdir AppDir \
             --executable build/cremniy \
@@ -169,73 +151,60 @@ jobs:
             --icon-file cremniy.png \
             --plugin qt \
             --output appimage
-          VERSION="${GITHUB_REF_NAME#v}"
-          APPIMAGE=$(find . -maxdepth 1 -name '*.AppImage' -type f | head -n 1)
-          mv "$APPIMAGE" "cremniy-${VERSION}-Linux.AppImage"
+          mv Cremniy-*.AppImage cremniy-linux-${{ github.ref_name }}.AppImage || mv cremniy-*.AppImage cremniy-linux-${{ github.ref_name }}.AppImage
 
-      - name: Package (Linux) - DEB
-        if: runner.os == 'Linux'
-        run: |
-          cd build
-          cpack -G DEB
-          VERSION="${GITHUB_REF_NAME#v}"
-          DEB=$(find . -maxdepth 1 -name '*.deb' -type f | head -n 1)
-          mv "$DEB" "../cremniy-${VERSION}-Linux.deb"
-
-      - name: Package (Windows) - ZIP
+      - name: Package (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path package -Force
+      
+          if (!(Test-Path "build/cremniy.exe")) {
+            throw "build/cremniy.exe was not produced"
+          }
+      
           Copy-Item build/cremniy.exe package/
+      
+          # Copy runtime DLL's
           $vcpkgBin = "vcpkg/installed/x64-windows/bin"
-          if (Test-Path $vcpkgBin) { Copy-Item "$vcpkgBin/*.dll" package/ }
+
+          if (!(Test-Path $vcpkgBin)) {
+            throw "vcpkg bin directory was not found: $vcpkgBin"
+          }
+          
+          Copy-Item "$vcpkgBin/*.dll" package/
+      
+          # Translations
           New-Item -ItemType Directory -Path "package/Resources/translations" -Force
           Copy-Item build/*.qm "package/Resources/translations/"
-          & "$env:QT_ROOT_DIR\bin\windeployqt.exe" --release --no-translations package\cremniy.exe
-          $version = $env:GITHUB_REF_NAME -replace '^v',''
-          Compress-Archive -Path package/* -DestinationPath "cremniy-$version-Windows.zip"
+      
+          # Qt dependencies
+          & "$env:QT_ROOT_DIR\bin\windeployqt.exe" `
+            --release `
+            --no-translations `
+            package\cremniy.exe
+      
+          Compress-Archive `
+            -Path package/* `
+            -DestinationPath cremniy-windows-${{ github.ref_name }}.zip
 
-      - name: Package (Windows) - NSIS
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          cd build
-          cpack -G NSIS
-          $version = $env:GITHUB_REF_NAME -replace '^v',''
-          $installer = Get-ChildItem . -Filter '*.exe' | Where-Object { $_.Name -notlike "*uninstall*" -and $_.Name -notlike "cremniy.exe" } | Select-Object -First 1
-          if ($installer) { Move-Item $installer.FullName "../cremniy-$version-Windows.exe" }
-
-      - name: Package (macOS) - TAR.GZ
+      - name: Package (macOS)
         if: runner.os == 'macOS'
         run: |
           mkdir -p package
           cp -r build/cremniy.app package/
-          macdeployqt package/cremniy.app -always-overwrite
+          macdeployqt package/cremniy.app
           cd package
-          VERSION="${GITHUB_REF_NAME#v}"
-          tar -czf "../cremniy-${VERSION}-macOS.tar.gz" cremniy.app
+          tar -czf ../cremniy-macos-${{ github.ref_name }}.tar.gz cremniy.app
 
-      - name: Package (macOS) - DMG
-        if: runner.os == 'macOS'
-        run: |
-          cd build
-          cpack -G DragNDrop
-          VERSION="${GITHUB_REF_NAME#v}"
-          DMG=$(find . -maxdepth 1 -name '*.dmg' -type f | head -n 1)
-          mv "$DMG" "../cremniy-${VERSION}-macOS.dmg"
-
-      - name: Upload artifacts
+      - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
           name: cremniy-${{ runner.os }}-${{ github.ref_name }}
           path: |
-            cremniy-*-Linux.AppImage
-            cremniy-*-Linux.deb
-            cremniy-*-Windows.zip
-            cremniy-*-Windows.exe
-            cremniy-*-macOS.tar.gz
-            cremniy-*-macOS.dmg
+            cremniy-linux-${{ github.ref_name }}.AppImage
+            cremniy-windows-${{ github.ref_name }}.zip
+            cremniy-macos-${{ github.ref_name }}.tar.gz
           if-no-files-found: error
 
   build-rpm:
@@ -245,9 +214,9 @@ jobs:
       image: fedora:41
 
     steps:
-      - name: Install git
+      - name: Install git (required before checkout)
         run: dnf install -y git tar
-
+        
       - name: Checkout code
         uses: actions/checkout@v6
         with:
@@ -266,7 +235,7 @@ jobs:
 
       - name: Setup rpmbuild tree
         run: rpmdev-setuptree
-
+        
       - name: Sync spec version with tag and disable Qt deploy
         run: |
           TAG_VERSION="${GITHUB_REF_NAME#v}"
@@ -288,10 +257,10 @@ jobs:
 
       - name: Build RPM
         run: |
-          echo '%debug_package %{nil}' >> ~/.rpmmacros
-          rpmbuild -bb "$HOME/rpmbuild/SPECS/cremniy.spec"
+            echo '%debug_package %{nil}' >> ~/.rpmmacros
+            rpmbuild -bb "$HOME/rpmbuild/SPECS/cremniy.spec"
 
-      - name: Collect RPMs
+      - name: Rename RPMs for clarity
         run: |
           mkdir -p dist
           find "$HOME/rpmbuild/RPMS" -name '*.rpm' -exec cp {} dist/ \;
@@ -321,19 +290,13 @@ jobs:
           path: artifacts
           merge-multiple: true
 
-      - name: Show release files
-        run: find artifacts -type f -print
-
       - name: Create Release
         uses: softprops/action-gh-release@v3
         with:
           files: |
-            artifacts/**/*.deb
-            artifacts/**/*.AppImage
-            artifacts/**/*.exe
-            artifacts/**/*.zip
-            artifacts/**/*.dmg
             artifacts/**/*.tar.gz
+            artifacts/**/*.zip
+            artifacts/**/*.AppImage
             artifacts/**/*.rpm
           draft: false
           prerelease: false
