@@ -270,11 +270,9 @@ jobs:
         run: |
           TAG_VERSION="${GITHUB_REF_NAME#v}"
           sed -i "s/^Version:.*/Version:        ${TAG_VERSION}/" rpm/cremniy.spec
-          # Добавляем макрос cmake_extra
-          sed -i '/^%global/i %global cmake_extra -DCREMNIY_ENABLE_QT_DEPLOY=OFF' rpm/cremniy.spec
-          # Заменяем %cmake на %cmake %{?cmake_extra}
-          sed -i 's/%cmake\([^%]\)/%cmake %{?cmake_extra}\1/g' rpm/cremniy.spec
-          echo "version=${TAG_VERSION}" >> "$GITHUB_ENV
+          # Добавляем -DCREMNIY_ENABLE_QT_DEPLOY=OFF в вызов %cmake, сохраняя остальные аргументы
+          sed -i 's/%cmake\( .*\)$/%cmake -DCREMNIY_ENABLE_QT_DEPLOY=OFF\1/' rpm/cremniy.spec
+          echo "version=${TAG_VERSION}" >> "$GITHUB_ENV"
 
       - name: Build source tarball
         run: |

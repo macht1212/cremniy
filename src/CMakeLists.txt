@@ -232,6 +232,11 @@ if(APPLE)
     target_link_libraries(${PROJECT_NAME} PRIVATE
         "-framework Cocoa"
         "-framework OpenGL"
+        "-framework IOKit"
+        "-framework Security"
+        "-framework ApplicationServices"
+        "-framework CoreFoundation"
+        "-framework CoreGraphics"
     )
 endif()
 
