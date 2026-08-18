@@ -228,6 +228,13 @@ if(NOT WIN32)
     )
 endif()
 
+if(APPLE)
+    target_link_libraries(${PROJECT_NAME} PRIVATE
+        "-framework Cocoa"
+        "-framework OpenGL"
+    )
+endif()
+
 set(APP_LANGUAGES en ru)
 list(JOIN APP_LANGUAGES ";" APP_LANGUAGES_STR)
 

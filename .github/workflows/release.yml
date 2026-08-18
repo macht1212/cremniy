@@ -44,6 +44,7 @@ jobs:
         uses: jurplel/install-qt-action@v4
         with:
           version: '6.8.2'
+          arch: ${{ runner.os == 'macOS' && 'macos' || '' }}
           cache: true
 
       - name: Install Linux dependencies
@@ -56,7 +57,7 @@ jobs:
             libxcb-render-util0 libxcb-xinerama0 libxcb-cursor0 \
             libxcb-xkb1 libdbus-1-3 \
             libfuse2 file imagemagick librsvg2-bin \
-            dpkg-dev fakeroot   # <-- для CPack DEB
+            dpkg-dev fakeroot
 
       - name: Cache vcpkg binary archives (Linux)
         if: runner.os == 'Linux'
@@ -244,7 +245,7 @@ jobs:
       image: fedora:41
 
     steps:
-      - name: Install git (required before checkout)
+      - name: Install git
         run: dnf install -y git tar
 
       - name: Checkout code
@@ -270,8 +271,7 @@ jobs:
         run: |
           TAG_VERSION="${GITHUB_REF_NAME#v}"
           sed -i "s/^Version:.*/Version:        ${TAG_VERSION}/" rpm/cremniy.spec
-          # Добавляем опцию для отключения развертывания Qt внутри пакета
-          sed -i '/^%cmake/a -DCREMNIY_ENABLE_QT_DEPLOY=OFF' rpm/cremniy.spec
+          sed -i 's/^%cmake/%cmake -DCREMNIY_ENABLE_QT_DEPLOY=OFF/' rpm/cremniy.spec
           echo "version=${TAG_VERSION}" >> "$GITHUB_ENV"
 
       - name: Build source tarball
