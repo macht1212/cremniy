@@ -74,10 +74,6 @@ if(NOT WIN32)
     find_library(HTTP_PARSER_LIB NAMES http_parser REQUIRED)
 endif()
 
-set(PROJECT_SOURCES
-        main.cpp
-)
-
 qt_add_executable(${PROJECT_NAME}
     MANUAL_FINALIZATION
     main.cpp
@@ -117,8 +113,8 @@ qt_add_executable(${PROJECT_NAME}
     # Utils
     utils/utils.h
     utils/utils.cpp
-        core/locale/LanguageManager.cpp
-        core/locale/LanguageManager.h
+    core/locale/LanguageManager.cpp
+    core/locale/LanguageManager.h
 
     # Core
     core/file/filecontext.h
@@ -233,25 +229,19 @@ if(NOT WIN32)
     )
 endif()
 
-set(APP_LANGUAGES
-        en
-        ru
-)
-
+# - - Translations - -
+set(APP_LANGUAGES en ru)
 list(JOIN APP_LANGUAGES ";" APP_LANGUAGES_STR)
 
 configure_file(
-        ${CMAKE_SOURCE_DIR}/config.h.in
-        ${CMAKE_BINARY_DIR}/config.h
+    ${CMAKE_SOURCE_DIR}/config.h.in
+    ${CMAKE_BINARY_DIR}/config.h
 )
-
-target_include_directories(${PROJECT_NAME} PRIVATE
-        ${CMAKE_BINARY_DIR}
-)
+target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_BINARY_DIR})
 
 set(TS_FILES
-        ${CMAKE_CURRENT_SOURCE_DIR}/resources/locale/translations/app_ru.ts
-        ${CMAKE_CURRENT_SOURCE_DIR}/resources/locale/translations/qtbase_ru.ts
+    ${CMAKE_CURRENT_SOURCE_DIR}/resources/locale/translations/app_ru.ts
+    ${CMAKE_CURRENT_SOURCE_DIR}/resources/locale/translations/qtbase_ru.ts
 )
 
 qt6_add_translation(QM_FILES ${TS_FILES})
@@ -260,13 +250,9 @@ add_custom_target(translations ALL DEPENDS ${QM_FILES})
 add_dependencies(${PROJECT_NAME} translations)
 
 if (APPLE)
-    set(TRANSLATIONS_DIR
-            "${CMAKE_BINARY_DIR}/${PROJECT_NAME}.app/Contents/Resources/translations"
-    )
+    set(TRANSLATIONS_DIR "${CMAKE_BINARY_DIR}/${PROJECT_NAME}.app/Contents/Resources/translations")
 else ()
-    set(TRANSLATIONS_DIR
-            "${CMAKE_BINARY_DIR}/Resources/translations"
-    )
+    set(TRANSLATIONS_DIR "${CMAKE_BINARY_DIR}/Resources/translations")
 endif ()
 
 file(MAKE_DIRECTORY ${TRANSLATIONS_DIR})
@@ -274,14 +260,14 @@ file(MAKE_DIRECTORY ${TRANSLATIONS_DIR})
 foreach(QM_FILE ${QM_FILES})
     get_filename_component(QM_FILENAME ${QM_FILE} NAME)
     add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${QM_FILE}"
-            "${TRANSLATIONS_DIR}/${QM_FILENAME}"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${QM_FILE}"
+        "${TRANSLATIONS_DIR}/${QM_FILENAME}"
     )
 endforeach()
 
+# - - Windows deployment (windeployqt) - -
 find_program(WINDEPLOYQT_EXECUTABLE windeployqt)
-
 if(WIN32 AND WINDEPLOYQT_EXECUTABLE)
     add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
         COMMAND ${WINDEPLOYQT_EXECUTABLE}
@@ -290,6 +276,7 @@ if(WIN32 AND WINDEPLOYQT_EXECUTABLE)
     )
 endif()
 
+# - - macOS bundle properties - -
 set_target_properties(${PROJECT_NAME} PROPERTIES
     ${BUNDLE_ID_OPTION}
     MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
@@ -297,6 +284,8 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
     MACOSX_BUNDLE TRUE
     WIN32_EXECUTABLE TRUE
 )
+
+# - - Installation - -
 include(GNUInstallDirs)
 
 install(TARGETS ${PROJECT_NAME}
@@ -305,27 +294,38 @@ install(TARGETS ${PROJECT_NAME}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
 
+# - - Install translations - -
+install(DIRECTORY ${CMAKE_BINARY_DIR}/Resources/
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/${PROJECT_NAME}/Resources
+    FILES_MATCHING PATTERN "*.qm"
+)
+
+# Install desktop file and icon (if present)
+# We will generate the desktop file in CI; but we can also provide a fallback.
+# Option 1: If cremniy.desktop exists in source root, install it.
+# Option 2: Generate it from a template.
+# For simplicity, we check if the file exists and install it.
+set(DESKTOP_FILE "${CMAKE_SOURCE_DIR}/cremniy.desktop")
+if(EXISTS "${DESKTOP_FILE}")
+    install(FILES "${DESKTOP_FILE}"
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/applications
+    )
+else()
+    message(STATUS "cremniy.desktop not found in source root, skipping installation")
+endif()
+
+# - - Install icon - -
+set(ICON_FILE "${CMAKE_CURRENT_SOURCE_DIR}/resources/icons/icon.svg")
+if(EXISTS "${ICON_FILE}")
+    install(FILES "${ICON_FILE}"
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps
+        RENAME cremniy.svg
+    )
+endif()
+
 set_target_properties(${PROJECT_NAME} PROPERTIES
-    INSTALL_RPATH "$ORIGIN/../lib"
-)
-
-install(
-    FILES ${CMAKE_SOURCE_DIR}/../cremniy.desktop
-    DESTINATION ${CMAKE_INSTALL_DATADIR}/applications
-)
-
-install(
-    FILES ${CMAKE_CURRENT_SOURCE_DIR}/resources/icons/icon.svg
-    DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps
-    RENAME cremniy.svg
-)
-
-qt_finalize_executable(${PROJECT_NAME})
-
-set_target_properties(${PROJECT_NAME} PROPERTIES
-    BUILD_RPATH "/opt/Qt6/6.8.2-xcb/lib"
     INSTALL_RPATH "\$ORIGIN/../lib"
-    INSTALL_RPATH_USE_LINK_PATH FALSE
+    INSTALL_RPATH_USE_LINK_PATH TRUE
 )
 
 qt_generate_deploy_app_script(
@@ -333,58 +333,35 @@ qt_generate_deploy_app_script(
     OUTPUT_SCRIPT deploy_script
     NO_TRANSLATIONS
 )
-
 install(SCRIPT ${deploy_script})
 
 set(CPACK_PACKAGE_NAME "cremniy")
 set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
-set(CPACK_PACKAGE_DESCRIPTION_SUMMARY
-    "Low-Level Development Environment"
-)
-
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Low-Level Development Environment")
 set(CPACK_PACKAGE_VENDOR "Cremniy")
 set(CPACK_PACKAGE_CONTACT "@igmunv")
 
-
 if(WIN32)
-
     set(CPACK_GENERATOR "NSIS")
-
     set(CPACK_PACKAGE_INSTALL_DIRECTORY "Cremniy")
-
     set(CPACK_NSIS_DISPLAY_NAME "Cremniy")
     set(CPACK_NSIS_PACKAGE_NAME "Cremniy")
-
     set(CPACK_NSIS_EXECUTABLES_DIRECTORY ".")
     set(CPACK_NSIS_CREATE_DESKTOP_LINKS "cremniy.exe")
     set(CPACK_NSIS_CREATE_START_MENU_SHORTCUTS "Cremniy")
-
-    set(CPACK_NSIS_FILE_NAME
-        "cremniy-${PROJECT_VERSION}-Windows.exe"
-    )
-
+    set(CPACK_NSIS_FILE_NAME "cremniy-${PROJECT_VERSION}-Windows.exe")
 elseif(APPLE)
-
     set(CPACK_GENERATOR "DragNDrop")
-
-    set(CPACK_PACKAGE_FILE_NAME
-        "cremniy-${PROJECT_VERSION}-macOS"
-    )
-
+    set(CPACK_PACKAGE_FILE_NAME "cremniy-${PROJECT_VERSION}-macOS")
 else()
-
     set(CPACK_GENERATOR "DEB")
-
     set(CPACK_DEBIAN_PACKAGE_MAINTAINER "@igmunv")
     set(CPACK_DEBIAN_PACKAGE_SECTION "devel")
     set(CPACK_DEBIAN_PACKAGE_PRIORITY "optional")
-
     set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
-
-    set(CPACK_DEBIAN_FILE_NAME
-        "cremniy-${PROJECT_VERSION}-Linux.deb"
-    )
-
+    set(CPACK_DEBIAN_FILE_NAME "cremniy-${PROJECT_VERSION}-Linux.deb")
 endif()
 
 include(CPack)
+
+qt_finalize_executable(${PROJECT_NAME})
