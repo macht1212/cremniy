@@ -56,7 +56,7 @@ jobs:
             libxcb-render-util0 libxcb-xinerama0 libxcb-cursor0 \
             libxcb-xkb1 libdbus-1-3 \
             libfuse2 file imagemagick librsvg2-bin \
-            dpkg-dev fakeroot    # <-- нужно для CPack DEB
+            dpkg-dev fakeroot   # <-- для CPack DEB
 
       - name: Cache vcpkg binary archives (Linux)
         if: runner.os == 'Linux'
@@ -112,6 +112,17 @@ jobs:
           chmod +x linuxdeploy-x86_64.AppImage
           chmod +x linuxdeploy-plugin-qt-x86_64.AppImage
 
+      - name: Configure CMake (Linux)
+        if: runner.os == 'Linux'
+        env:
+          SCCACHE_GHA_ENABLED: "true"
+        run: |
+          cmake -B build -S src \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER_LAUNCHER=sccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
+            -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake"
+
       - name: Configure CMake (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
@@ -123,31 +134,26 @@ jobs:
             -G "Ninja" `
             -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl `
             -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache `
-            -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}\\vcpkg\\scripts\\buildsystems\\vcpkg.cmake"
+            -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}\vcpkg\scripts\buildsystems\vcpkg.cmake"
 
       - name: Configure CMake (macOS)
         if: runner.os == 'macOS'
         env:
           SCCACHE_GHA_ENABLED: "true"
         run: |
-          cmake -B build -S src `
-            -DCMAKE_BUILD_TYPE=Release `
-            -G "Unix Makefiles" `   # <-- явно указываем Makefiles, не Xcode
-            -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache `
-            -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake"
-
-      - name: Configure CMake (Linux)
-        if: runner.os == 'Linux'
-        env:
-          SCCACHE_GHA_ENABLED: "true"
-        run: |
-          cmake -B build -S src `
-            -DCMAKE_BUILD_TYPE=Release `
-            -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache `
+          cmake -B build -S src \
+            -DCMAKE_BUILD_TYPE=Release \
+            -G "Unix Makefiles" \
+            -DCMAKE_C_COMPILER_LAUNCHER=sccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
             -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake"
 
       - name: Build
         run: cmake --build build --config Release --parallel
+
+      - name: Install NSIS (Windows)
+        if: runner.os == 'Windows'
+        run: choco install nsis -y
 
       - name: Package (Linux) - AppImage
         if: runner.os == 'Linux'
@@ -162,7 +168,6 @@ jobs:
             --icon-file cremniy.png \
             --plugin qt \
             --output appimage
-          # Переименовываем с версией
           VERSION="${GITHUB_REF_NAME#v}"
           APPIMAGE=$(find . -maxdepth 1 -name '*.AppImage' -type f | head -n 1)
           mv "$APPIMAGE" "cremniy-${VERSION}-Linux.AppImage"
@@ -184,10 +189,8 @@ jobs:
           Copy-Item build/cremniy.exe package/
           $vcpkgBin = "vcpkg/installed/x64-windows/bin"
           if (Test-Path $vcpkgBin) { Copy-Item "$vcpkgBin/*.dll" package/ }
-          # Translations
           New-Item -ItemType Directory -Path "package/Resources/translations" -Force
           Copy-Item build/*.qm "package/Resources/translations/"
-          # Qt dependencies
           & "$env:QT_ROOT_DIR\bin\windeployqt.exe" --release --no-translations package\cremniy.exe
           $version = $env:GITHUB_REF_NAME -replace '^v',''
           Compress-Archive -Path package/* -DestinationPath "cremniy-$version-Windows.zip"
@@ -263,10 +266,12 @@ jobs:
       - name: Setup rpmbuild tree
         run: rpmdev-setuptree
 
-      - name: Sync spec version with tag
+      - name: Sync spec version with tag and disable Qt deploy
         run: |
           TAG_VERSION="${GITHUB_REF_NAME#v}"
           sed -i "s/^Version:.*/Version:        ${TAG_VERSION}/" rpm/cremniy.spec
+          # Добавляем опцию для отключения развертывания Qt внутри пакета
+          sed -i '/^%cmake/a -DCREMNIY_ENABLE_QT_DEPLOY=OFF' rpm/cremniy.spec
           echo "version=${TAG_VERSION}" >> "$GITHUB_ENV"
 
       - name: Build source tarball

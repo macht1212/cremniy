@@ -9,6 +9,8 @@ set(CMAKE_AUTORCC ON)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+option(CREMNIY_ENABLE_QT_DEPLOY "Enable Qt deployment during install" ON)
+
 find_package(Qt6 6.8.2 REQUIRED COMPONENTS Core Widgets Gui Concurrent LinguistTools Test Svg Network)
 
 # libgit2 ships a CMake package on some platforms and only a pkg-config file or
@@ -190,19 +192,16 @@ qt_add_resources(${PROJECT_NAME} "phoicons"
     FILES ${PHOICONS_FILES}
 )
 
-# - - Libs - -
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/libs/CodeEditor/ ${CMAKE_BINARY_DIR}/libs/CodeEditor/)
 target_link_libraries(${PROJECT_NAME} PRIVATE CodeEditor)
 
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/libs/HexEditor/ ${CMAKE_BINARY_DIR}/libs/HexEditor/)
 target_link_libraries(${PROJECT_NAME} PRIVATE HexEditor)
 
-# - - Modules - -
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/Modules/References/)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/Modules/Tabs/)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/Modules/Windows/)
 
-# - - Menus - -
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/ui/MenuBar/Menus/)
 
 if(CREMNIY_LIBGIT2_INCLUDE_DIRS)
@@ -229,7 +228,6 @@ if(NOT WIN32)
     )
 endif()
 
-# - - Translations - -
 set(APP_LANGUAGES en ru)
 list(JOIN APP_LANGUAGES ";" APP_LANGUAGES_STR)
 
@@ -266,7 +264,6 @@ foreach(QM_FILE ${QM_FILES})
     )
 endforeach()
 
-# - - Windows deployment (windeployqt) - -
 find_program(WINDEPLOYQT_EXECUTABLE windeployqt)
 if(WIN32 AND WINDEPLOYQT_EXECUTABLE)
     add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
@@ -276,7 +273,6 @@ if(WIN32 AND WINDEPLOYQT_EXECUTABLE)
     )
 endif()
 
-# - - macOS bundle properties - -
 set_target_properties(${PROJECT_NAME} PROPERTIES
     ${BUNDLE_ID_OPTION}
     MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
@@ -285,7 +281,6 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
     WIN32_EXECUTABLE TRUE
 )
 
-# - - Installation - -
 include(GNUInstallDirs)
 
 install(TARGETS ${PROJECT_NAME}
@@ -294,17 +289,11 @@ install(TARGETS ${PROJECT_NAME}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
 
-# - - Install translations - -
 install(DIRECTORY ${CMAKE_BINARY_DIR}/Resources/
     DESTINATION ${CMAKE_INSTALL_DATADIR}/${PROJECT_NAME}/Resources
     FILES_MATCHING PATTERN "*.qm"
 )
 
-# Install desktop file and icon (if present)
-# We will generate the desktop file in CI; but we can also provide a fallback.
-# Option 1: If cremniy.desktop exists in source root, install it.
-# Option 2: Generate it from a template.
-# For simplicity, we check if the file exists and install it.
 set(DESKTOP_FILE "${CMAKE_SOURCE_DIR}/cremniy.desktop")
 if(EXISTS "${DESKTOP_FILE}")
     install(FILES "${DESKTOP_FILE}"
@@ -314,7 +303,6 @@ else()
     message(STATUS "cremniy.desktop not found in source root, skipping installation")
 endif()
 
-# - - Install icon - -
 set(ICON_FILE "${CMAKE_CURRENT_SOURCE_DIR}/resources/icons/icon.svg")
 if(EXISTS "${ICON_FILE}")
     install(FILES "${ICON_FILE}"
@@ -328,12 +316,14 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
     INSTALL_RPATH_USE_LINK_PATH TRUE
 )
 
-qt_generate_deploy_app_script(
-    TARGET ${PROJECT_NAME}
-    OUTPUT_SCRIPT deploy_script
-    NO_TRANSLATIONS
-)
-install(SCRIPT ${deploy_script})
+if(CREMNIY_ENABLE_QT_DEPLOY)
+    qt_generate_deploy_app_script(
+        TARGET ${PROJECT_NAME}
+        OUTPUT_SCRIPT deploy_script
+        NO_TRANSLATIONS
+    )
+    install(SCRIPT ${deploy_script})
+endif()
 
 set(CPACK_PACKAGE_NAME "cremniy")
 set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
