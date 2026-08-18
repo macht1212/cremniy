@@ -44,7 +44,6 @@ jobs:
         uses: jurplel/install-qt-action@v4
         with:
           version: '6.8.2'
-          arch: ${{ runner.os == 'macOS' && 'macos' || '' }}
           cache: true
 
       - name: Install Linux dependencies
@@ -271,8 +270,11 @@ jobs:
         run: |
           TAG_VERSION="${GITHUB_REF_NAME#v}"
           sed -i "s/^Version:.*/Version:        ${TAG_VERSION}/" rpm/cremniy.spec
-          sed -i 's/^%cmake/%cmake -DCREMNIY_ENABLE_QT_DEPLOY=OFF/' rpm/cremniy.spec
-          echo "version=${TAG_VERSION}" >> "$GITHUB_ENV"
+          # Добавляем макрос cmake_extra
+          sed -i '/^%global/i %global cmake_extra -DCREMNIY_ENABLE_QT_DEPLOY=OFF' rpm/cremniy.spec
+          # Заменяем %cmake на %cmake %{?cmake_extra}
+          sed -i 's/%cmake\([^%]\)/%cmake %{?cmake_extra}\1/g' rpm/cremniy.spec
+          echo "version=${TAG_VERSION}" >> "$GITHUB_ENV
 
       - name: Build source tarball
         run: |
